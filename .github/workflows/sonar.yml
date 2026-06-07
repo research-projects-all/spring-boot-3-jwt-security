@@ -14,6 +14,8 @@ jobs:
   sonarcloud:
     name: Build and analyze with SonarCloud
     runs-on: ubuntu-latest
+
+    # Avoid leaking SONAR_TOKEN to pull requests from forks.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
 
     steps:
@@ -29,24 +31,12 @@ jobs:
           java-version: '17'
           cache: maven
 
-      - name: Compile all Maven projects
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          find . -name pom.xml -not -path '*/target/*' | sort | while read -r pom; do
-            echo "Compiling $(dirname "$pom")"
-            mvn -B -q -f "$pom" -DskipTests clean compile
-          done
-
-      - name: SonarCloud scan
-        uses: SonarSource/sonarqube-scan-action@v8.1.0
+      - name: Build and analyze with Maven
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-        with:
-          args: >
-            -Dsonar.organization=research-projects-all
+        run: |
+          chmod +x ./mvnw
+          ./mvnw -B clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+            -DskipTests \
+            -Dsonar.organization=research-projects-all \
             -Dsonar.projectKey=research-projects-all_spring-boot-3-jwt-security
-            -Dsonar.sources=.
-            -Dsonar.java.binaries=**/target/classes
-            -Dsonar.exclusions=**/target/**,**/.mvn/**,**/mvnw,**/mvnw.cmd
